@@ -6,24 +6,14 @@ from dataclasses import is_dataclass
 from unittest.mock import patch
 
 # Importamos las clases de tu script
-try:
-    from esr_zips_v3 import (
-        ESR,
-        ESRExtractor,
-        ESRZipProcessor,
-        ESRAnonymizer,
-        ESRExporter,
-        ESRPipeline,
-    )
-except ImportError:
-    from esr_pipeline import (
-        ESR,
-        ESRExtractor,
-        ESRZipProcessor,
-        ESRAnonymizer,
-        ESRExporter,
-        ESRPipeline,
-    )
+from esr_package import (
+    ESR,
+    ESRExtractor,
+    ESRZipProcessor,
+    ESRAnonymizer,
+    ESRExporter,
+    ESRPipeline,
+)
 
 
 # =============================================================================
