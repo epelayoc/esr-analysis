@@ -9,6 +9,7 @@ description = "Pipeline para procesamiento y anonimización de archivos ESR"
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
+    "PyPDF2",
     "pypdf>=3.0.0",
     "pandas>=2.0.0",
     "cryptography>=41.0.0",
