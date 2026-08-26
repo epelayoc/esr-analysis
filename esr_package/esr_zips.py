@@ -66,9 +66,10 @@ except ImportError:  # pragma: no cover - dependencia opcional en tiempo de impo
     AESGCM = None  # type: ignore
 
 try:
-    from tqdm.auto import tqdm
+    #from tqdm.auto import tqdm
+    from tqdm.notebook import tqdm
 except ImportError:  # pragma: no cover
-    def tqdm(iterable, **kwargs):  # type: ignore
+    def (iterable, **kwargs):  # type: ignore
         return iterable
 
 # --------------------------------------------------------------------------- #
@@ -320,7 +321,8 @@ from datetime import datetime
 from typing import Optional, Sequence, Tuple, List, Dict
 
 import pandas as pd
-from tqdm import tqdm
+#from tqdm import tqdm
+from tqdm.notebook import tqdm
 
 # Importación condicional de Google Colab
 try:
