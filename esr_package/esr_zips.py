@@ -312,52 +312,61 @@ class ESRExtractor:
         return ESR(source_path=file_path, data=row_data, error_code=error_code)
 
 
+import os
+import shutil
+import zipfile
+import logging
+from datetime import datetime
+from typing import Optional, Sequence, Tuple, List, Dict
+
+import pandas as pd
+from tqdm import tqdm
+
+# Importación condicional de Google Colab
+try:
+    from google.colab import files
+    IN_COLAB = True
+except ImportError:
+    files = None
+    IN_COLAB = False
+
+logger = logging.getLogger(__name__)
+
 # =============================================================================
 # ESRZipProcessor  ------------------------------------------------------ ZIP -> PDFs
 # =============================================================================
 class ESRZipProcessor:
     """Descomprime ZIP(s) (incluyendo ZIPs anidados), localiza los PDFs de ESR
     (``*esr.pdf``) y usa un ``ESRExtractor`` para construir la lista/DataFrame
-    de resultados. Equivalente a ``docs_extraction`` en el notebook original.
+    de resultados. Permite subir ZIPs interactivamente en Google Colab y consolidar
+    el resultado con un DataFrame provisto desde un archivo Excel.
     """
 
     def __init__(
         self,
         extractor: Optional[ESRExtractor] = None,
-        temp_folder: str = "temp_unzip_content",
-        drive_input_folder: str = "My Drive/ESRs/ESR_Input",
-        drive_output_folder: str = "My Drive/ESRs/ESR_Output",
+        temp_folder: str = "/content/temp_unzip_content",
+        colab_output_folder: str = "/content/PDF",
+        upload_temp_dir: str = "/content/uploaded_zips_for_processing",
         error_log_file: str = "extraction_errors.log",
-        drive_mount_point: str = "/content/drive",
-        use_colab_drive: bool = IN_COLAB,
     ) -> None:
         self.extractor = extractor or ESRExtractor()
         self.temp_folder = temp_folder
-        self.drive_input_folder = drive_input_folder
-        self.drive_output_folder = drive_output_folder
+        self.output_folder = colab_output_folder
+        self.upload_temp_dir = upload_temp_dir
         self.error_log_file = error_log_file
-        self.drive_mount_point = drive_mount_point
-        self.use_colab_drive = use_colab_drive and IN_COLAB
 
         #: Registros (`ESR`) acumulados tras la última llamada a `process`.
         self.records: List[ESR] = []
         #: Log de fichero -> zip de origen, tras la última llamada a `process`.
         self.file_log_data: List[Dict[str, str]] = []
 
-        if self.use_colab_drive:
-            _colab_drive.mount(self.drive_mount_point)  # pragma: no cover
+        # Asegurar la creación del directorio de salida
+        os.makedirs(self.output_folder, exist_ok=True)
 
     # -- utilidades internas -------------------------------------------------
-    def _resolve_input_output_paths(self, output_dir: Optional[str]) -> Tuple[str, str]:
-        if self.use_colab_drive:
-            full_drive_input_path = os.path.join(self.drive_mount_point, self.drive_input_folder)
-            full_drive_output_path = output_dir or os.path.join(
-                self.drive_mount_point, self.drive_output_folder
-            )
-        else:
-            full_drive_input_path = self.drive_input_folder
-            full_drive_output_path = output_dir or self.drive_output_folder
-        return full_drive_input_path, full_drive_output_path
+    def _resolve_output_path(self, output_dir: Optional[str]) -> str:
+        return output_dir or self.output_folder
 
     @staticmethod
     def _extract_nested_zips(root_folder: str, log_f, errors_occurred: bool) -> bool:
@@ -390,126 +399,158 @@ class ESRZipProcessor:
         zip_source_paths: Optional[Sequence[str]] = None,
         output_dir: Optional[str] = None,
         input_excel_path: Optional[str] = None,
+        upload_zips: bool = False,
     ) -> Tuple[pd.DataFrame, str, bool]:
         """Procesa uno o varios ZIPs y devuelve ``(df, error_log_path, errors_occurred)``.
 
         Parámetros
         ----------
-        zip_source_paths: rutas explícitas a ZIPs a procesar. Si es ``None``
-            se listan los ``.zip`` de ``drive_input_folder`` (equivalente al
-            comportamiento original cuando no se pasa una lista de ZIPs).
+        zip_source_paths: rutas explícitas a ZIPs a procesar.
         output_dir: carpeta de salida donde copiar los PDFs procesados y el
-            log de errores (equivalente a ``DRIVE_OUTPUT_FOLDER``).
-        input_excel_path: parámetro conservado por compatibilidad con la
-            firma original de ``docs_extraction``; no se usa (tampoco se
-            usaba en la implementación original).
+            log de errores (por defecto /content/PDF).
+        input_excel_path: ruta opcional a un archivo Excel (.xlsx, .xls) para
+            leer y combinar/anexar su Dataframe al Dataframe extraído de los PDFs.
+        upload_zips: forzar la subida interactiva mediante `files.upload()`.
+            Si `zip_source_paths` es `None`, se activa por defecto en Google Colab.
         """
-        full_input_path, full_output_path = self._resolve_input_output_paths(output_dir)
+        full_output_path = self._resolve_output_path(output_dir)
         full_error_log_path = os.path.join(full_output_path, self.error_log_file)
-
-        if os.path.exists(self.temp_folder):
-            shutil.rmtree(self.temp_folder)
-
-        if zip_source_paths is not None:
-            zip_files_to_process = list(zip_source_paths)
-        else:
-            if not os.path.exists(full_input_path):
-                logger.info("❌ Error: Input folder not found.")
-                return pd.DataFrame(), full_error_log_path, False
-            zip_files_to_process = [
-                os.path.join(full_input_path, f)
-                for f in os.listdir(full_input_path)
-                if f.lower().endswith(".zip")
-            ]
 
         if not os.path.exists(full_output_path):
             os.makedirs(full_output_path)
 
-        if not zip_files_to_process:
-            logger.info("No ZIP files found to process.")
-            return pd.DataFrame(), full_error_log_path, False
+        # Limpieza previa de carpeta temporal
+        if os.path.exists(self.temp_folder):
+            shutil.rmtree(self.temp_folder)
+
+        zip_files_to_process: List[str] = []
+        is_uploaded_temp = False
+
+        # 1. Determinar el origen de los archivos ZIP
+        if zip_source_paths is not None:
+            zip_files_to_process = list(zip_source_paths)
+        elif upload_zips or IN_COLAB:
+            if files is not None:
+                if not os.path.exists(self.upload_temp_dir):
+                    os.makedirs(self.upload_temp_dir)
+
+                print("Please upload your ZIP files.")
+                uploaded = files.upload()
+
+                if uploaded:
+                    for fn in uploaded.keys():
+                        local_path = os.path.join(self.upload_temp_dir, fn)
+                        with open(local_path, "wb") as f:
+                            f.write(uploaded[fn])
+                        zip_files_to_process.append(local_path)
+                    is_uploaded_temp = True
+                else:
+                    print("No files uploaded.")
+            else:
+                logger.warning("⚠️ google.colab.files no está disponible en este entorno.")
 
         records: List[ESR] = []
         total_found_files = 0
         file_log_data: List[Dict[str, str]] = []
         errors_occurred = False
 
-        with open(full_error_log_path, "a", encoding="utf-8") as log_f:
-            log_f.write(f"\n--- Log started: {datetime.now()} ---\n")
+        try:
+            if zip_files_to_process:
+                with open(full_error_log_path, "a", encoding="utf-8") as log_f:
+                    log_f.write(f"\n--- Log started: {datetime.now()} ---\n")
 
-            for current_zip_full_path in tqdm(zip_files_to_process, desc="Processing ZIP files"):
-                zip_file_name = os.path.basename(current_zip_full_path)
-                logger.info(f"📂 Processing ZIP: {zip_file_name}")
-                if os.path.exists(self.temp_folder):
-                    shutil.rmtree(self.temp_folder)
-                os.makedirs(self.temp_folder)
+                    for current_zip_full_path in tqdm(zip_files_to_process, desc="Processing ZIP files"):
+                        zip_file_name = os.path.basename(current_zip_full_path)
+                        logger.info(f"📂 Processing ZIP: {zip_file_name}")
+                        if os.path.exists(self.temp_folder):
+                            shutil.rmtree(self.temp_folder)
+                        os.makedirs(self.temp_folder)
 
-                try:
-                    with zipfile.ZipFile(current_zip_full_path, "r") as zip_ref:
-                        zip_ref.extractall(self.temp_folder)
-                except Exception as e:  # noqa: BLE001
-                    error_msg = f"❌ Error unzipping {zip_file_name}: {e}"
-                    logger.info(error_msg)
-                    log_f.write(f"{datetime.now()} - {error_msg}\n")
-                    errors_occurred = True
-                    continue
-
-                errors_occurred = self._extract_nested_zips(self.temp_folder, log_f, errors_occurred)
-
-                esr_pdfs_in_zip = []
-                for root, _, filenames in os.walk(self.temp_folder):
-                    for fname in filenames:
-                        if fname.lower().endswith("esr.pdf"):
-                            esr_pdfs_in_zip.append(os.path.join(root, fname))
-
-                for source_path in tqdm(
-                    esr_pdfs_in_zip,
-                    desc=f"  Extracting PDFs from {zip_file_name}",
-                    leave=False,
-                ):
-                    fname = os.path.basename(source_path)
-
-                    # 1. Extraer datos con ESRExtractor
-                    try:
-                        esr = self.extractor.extract(source_path)
-                        records.append(esr)
-                        if not esr.is_valid:
-                            error_msg = f"  ⚠️ Extraction error {esr.error_code} in {fname}"
+                        try:
+                            with zipfile.ZipFile(current_zip_full_path, "r") as zip_ref:
+                                zip_ref.extractall(self.temp_folder)
+                        except Exception as e:  # noqa: BLE001
+                            error_msg = f"❌ Error unzipping {zip_file_name}: {e}"
                             logger.info(error_msg)
                             log_f.write(f"{datetime.now()} - {error_msg}\n")
                             errors_occurred = True
-                    except Exception as e:  # noqa: BLE001
-                        error_msg = f"  ❌ Failed to extract data from {fname}: {e}"
-                        logger.info(error_msg)
-                        log_f.write(f"{datetime.now()} - {error_msg}\n")
-                        errors_occurred = True
-                        continue
+                            continue
 
-                    # 2. Guardar copia del PDF en la carpeta de salida
-                    dest_file_name = fname
-                    dest_path = os.path.join(full_output_path, dest_file_name)
+                        errors_occurred = self._extract_nested_zips(self.temp_folder, log_f, errors_occurred)
 
-                    counter = 0
-                    while os.path.exists(dest_path):
-                        counter += 1
-                        name, ext = os.path.splitext(fname)
-                        dest_file_name = f"{name}_{counter}{ext}"
-                        dest_path = os.path.join(full_output_path, dest_file_name)
+                        esr_pdfs_in_zip = []
+                        for root, _, filenames in os.walk(self.temp_folder):
+                            for fname in filenames:
+                                if fname.lower().endswith("esr.pdf"):
+                                    esr_pdfs_in_zip.append(os.path.join(root, fname))
 
-                    shutil.copy2(source_path, dest_path)
+                        for source_path in tqdm(
+                            esr_pdfs_in_zip,
+                            desc=f"  Extracting PDFs from {zip_file_name}",
+                            leave=False,
+                        ):
+                            fname = os.path.basename(source_path)
 
-                    file_log_data.append({"ZIP": zip_file_name, "File": dest_file_name})
-                    total_found_files += 1
+                            # 1. Extraer datos con ESRExtractor
+                            try:
+                                esr = self.extractor.extract(source_path)
+                                records.append(esr)
+                                if not esr.is_valid:
+                                    error_msg = f"  ⚠️ Extraction error {esr.error_code} in {fname}"
+                                    logger.info(error_msg)
+                                    log_f.write(f"{datetime.now()} - {error_msg}\n")
+                                    errors_occurred = True
+                            except Exception as e:  # noqa: BLE001
+                                error_msg = f"  ❌ Failed to extract data from {fname}: {e}"
+                                logger.info(error_msg)
+                                log_f.write(f"{datetime.now()} - {error_msg}\n")
+                                errors_occurred = True
+                                continue
 
-            log_f.write(f"--- Log finished: {datetime.now()} ---\n")
+                            # 2. Guardar copia del PDF en la carpeta de salida (/content/PDF)
+                            dest_file_name = fname
+                            dest_path = os.path.join(full_output_path, dest_file_name)
 
-        if os.path.exists(self.temp_folder):
-            shutil.rmtree(self.temp_folder)
+                            counter = 0
+                            while os.path.exists(dest_path):
+                                counter += 1
+                                name, ext = os.path.splitext(fname)
+                                dest_file_name = f"{name}_{counter}{ext}"
+                                dest_path = os.path.join(full_output_path, dest_file_name)
+
+                            shutil.copy2(source_path, dest_path)
+
+                            file_log_data.append({"ZIP": zip_file_name, "File": dest_file_name})
+                            total_found_files += 1
+
+                    log_f.write(f"--- Log finished: {datetime.now()} ---\n")
+            else:
+                logger.info("No ZIP files found or uploaded to process.")
+        finally:
+            # Limpieza de carpetas temporales tras el procesamiento
+            if os.path.exists(self.temp_folder):
+                shutil.rmtree(self.temp_folder)
+            if is_uploaded_temp and os.path.exists(self.upload_temp_dir):
+                shutil.rmtree(self.upload_temp_dir)
 
         self.records = records
         self.file_log_data = file_log_data
 
-        df = ESR.to_dataframe(records)
+        # Generar DataFrame con los registros extraídos
+        df = ESR.to_dataframe(records) if records else pd.DataFrame()
+
+        # Incorporar DataFrame desde archivo Excel si se proporciona
+        if input_excel_path:
+            if os.path.exists(input_excel_path):
+                try:
+                    logger.info(f"📄 Loading existing Excel data from: {input_excel_path}")
+                    excel_df = pd.read_excel(input_excel_path)
+                    df = pd.concat([df, excel_df], ignore_index=True)
+                except Exception as e:
+                    logger.error(f"❌ Error reading Excel file at {input_excel_path}: {e}")
+            else:
+                logger.warning(f"⚠️ Warning: input_excel_path specified ({input_excel_path}) but file does not exist.")
+
         return df, full_error_log_path, errors_occurred
 
 
