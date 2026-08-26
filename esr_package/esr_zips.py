@@ -335,7 +335,7 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 # ESRZipProcessor  ------------------------------------------------------ ZIP -> PDFs
 # =============================================================================
-class ESRZipProcessor:
+class ESR_Unzipper:
     """Descomprime ZIP(s) (incluyendo ZIPs anidados), localiza los PDFs de ESR
     (``*esr.pdf``) y usa un ``ESRExtractor`` para construir la lista/DataFrame
     de resultados. Permite subir ZIPs interactivamente en Google Colab y consolidar
@@ -394,7 +394,7 @@ class ESRZipProcessor:
         return errors_occurred
 
     # -- API pública -----------------------------------------------------
-    def process(
+    def unzip(
         self,
         zip_source_paths: Optional[Sequence[str]] = None,
         output_dir: Optional[str] = None,
