@@ -2361,7 +2361,11 @@ class ESRMasterPipeline:
                 logger.warning(
                     f"⚠️ input_excel_path especificado ({input_excel_path}) pero no existe."
                 )
-
+                
+        pre_classified_file = os.path.join(output_dir, "extracted_raw_data.xlsx")
+        result["dataframe"].to_excel(pre_classified_file, index=False)
+        logger.info(f"📊 Excel tras extracción guardado en: {pre_classified_file}")
+        
         return result
 
     # ------------------------------------------------------------------
