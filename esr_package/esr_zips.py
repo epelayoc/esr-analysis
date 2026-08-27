@@ -66,10 +66,10 @@ except ImportError:  # pragma: no cover - dependencia opcional en tiempo de impo
     AESGCM = None  # type: ignore
 
 try:
-    from tqdm.auto import tqdm
-    #from tqdm.notebook import tqdm
+    #from tqdm.auto import tqdm
+    from tqdm.notebook import tqdm
 except ImportError:  # pragma: no cover
-    def (iterable, **kwargs):  # type: ignore
+    def tqdm(iterable, **kwargs):  # type: ignore
         return iterable
 
 # --------------------------------------------------------------------------- #
