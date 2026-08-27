@@ -641,16 +641,16 @@ class ESRZipProcessor:
                                 errors_occurred = True
                                 continue
 
-                            # 2. Guardar copia del PDF en la carpeta de salida (/content/PDF)
+                           # 2. Guardar copia del PDF en la subcarpeta PDFs
                             dest_file_name = fname
-                            dest_path = os.path.join(full_output_path, dest_file_name)
+                            dest_path = os.path.join(pdf_output_dir, dest_file_name)
 
                             counter = 0
                             while os.path.exists(dest_path):
                                 counter += 1
                                 name, ext = os.path.splitext(fname)
                                 dest_file_name = f"{name}_{counter}{ext}"
-                                dest_path = os.path.join(full_output_path, dest_file_name)
+                                dest_path = os.path.join(pdf_output_dir, dest_file_name)
 
                             shutil.copy2(source_path, dest_path)
 
