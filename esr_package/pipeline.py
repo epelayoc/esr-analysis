@@ -548,7 +548,11 @@ class ESRZipProcessor:
 
         if not os.path.exists(full_output_path):
             os.makedirs(full_output_path)
+            
+        pdf_output_dir = os.path.join(full_output_path, "PDFs")
 
+        if not os.path.exists(pdf_output_dir):
+            os.makedirs(pdf_output_dir, exist_ok=True)
         # Limpieza previa de carpeta temporal
         if os.path.exists(self.temp_folder):
             shutil.rmtree(self.temp_folder)
