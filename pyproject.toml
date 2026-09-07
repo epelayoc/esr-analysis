@@ -9,9 +9,15 @@ description = "Pipeline de análisis y procesamiento ESR"
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
-    # Enumera las librerías necesarias para tu script
+    "pandas",
+    "openpyxl",
+    "PyPDF2",
     "cryptography",
-    "huggingface-hub"
+    "huggingface-hub",
+    "nltk",
+    "sentence-transformers",
+    "transformers",
+    "torch"
 ]
 
 [project.scripts]
