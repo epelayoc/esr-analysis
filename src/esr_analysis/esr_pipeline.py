@@ -174,6 +174,8 @@ def _load_hf_token() -> None:
 # Ejecutar la carga del token
 _load_hf_token()
 
+print('\n\n===================\n\n)
+
 # ---------------------------------------------------------------------------
 # cryptography (AES-GCM), usado solo por la etapa de extracción para cifrar
 # columnas sensibles. Opcional: si no está instalado, simplemente no se puede
