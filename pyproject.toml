@@ -17,7 +17,9 @@ dependencies = [
     "nltk",
     "sentence-transformers",
     "transformers",
-    "torch"
+    "torch",
+    "bitsandbytes",
+    "accelerate"
 ]
 
 [project.scripts]
