@@ -549,7 +549,7 @@ class ESRZipProcessor:
             zips_extracted = False
             for root, _, filenames in os.walk(root_folder):
                 for f in filenames:
-                    if f.lower().endswith(".zip"):
+                    if f.lower().endswith(".zip") or f.lower().endswith(".zp"):
                         zp = os.path.join(root, f)
                         if zp not in processed_zips:
                             try:
