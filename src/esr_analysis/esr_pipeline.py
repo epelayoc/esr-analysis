@@ -68,7 +68,7 @@ Uso por línea de comandos
 También puede usarse de forma programática importando ``ESRMasterPipeline``
 o cualquiera de las clases individuales de cada etapa.
 """
-a=1/0
+
 from __future__ import annotations
 
 import argparse
@@ -174,7 +174,7 @@ def _load_hf_token() -> None:
 # Ejecutar la carga del token
 _load_hf_token()
 
-print('\n\n===================\n\n)
+print('\n\n===================\n\n')
 
 # ---------------------------------------------------------------------------
 # cryptography (AES-GCM), usado solo por la etapa de extracción para cifrar
