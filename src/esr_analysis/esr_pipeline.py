@@ -68,7 +68,7 @@ Uso por línea de comandos
 También puede usarse de forma programática importando ``ESRMasterPipeline``
 o cualquiera de las clases individuales de cada etapa.
 """
-
+a=1/0
 from __future__ import annotations
 
 import argparse
