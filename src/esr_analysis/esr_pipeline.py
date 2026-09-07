@@ -2947,7 +2947,7 @@ def main(argv: Optional[Sequence[str]] = None) -> Any:
             logger.info(f"📊 Resultado guardado en {result['export_path']}")
         if result["errors_occurred"]:
             logger.info(f"⚠️ Se registraron errores en {result['error_log_path']}.")
-        return result
+        return # result
 
     if args.command == "classify":
         result_df = master.run_classification(
@@ -2967,7 +2967,7 @@ def main(argv: Optional[Sequence[str]] = None) -> Any:
         )
         if not result_df.empty:
             logger.info("Vista previa de resultados:\n%s", result_df.head())
-        return result_df
+        return # result_df
 
     if args.command == "summarize":
         sheet = None if args.sheet_name and "all" in [s.lower() for s in args.sheet_name] else args.sheet_name
@@ -2987,7 +2987,7 @@ def main(argv: Optional[Sequence[str]] = None) -> Any:
         )
         elapsed = time.perf_counter() - t0
         logger.info(f"⏱️ Resumen completado en {elapsed:.2f}s. Archivo guardado en: {output_path}")
-        return result
+        return # result
 
     if args.command == "full":
         zip_source_paths = _resolve_zip_sources(args.zips, args.input_folder)
