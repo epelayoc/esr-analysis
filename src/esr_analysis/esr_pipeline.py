@@ -3039,7 +3039,7 @@ def main(argv: Optional[Sequence[str]] = None) -> Any:
             logger.info(f"📊 Clasificación guardada en {classification_output_path}")
         if "summary_output_path" in results:
             logger.info(f"🧠 Resumen LLM guardado en {results['summary_output_path']}")
-        return results
+        return # results
 
     raise ValueError(f"Comando desconocido: {args.command}")
 
